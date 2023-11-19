@@ -249,7 +249,7 @@ timer1:
 	sts	ADCSRA_BTN, r20
 
 wait:
-	lds r20, ADCSRA_BTN ; current timer but wrong???
+	lds r20, ADCSRA_BTN ; current timer 
 	andi r20, 0x40
 	brne wait
 
@@ -280,29 +280,7 @@ timer3:
 	
 	lds r27, BUTTON_IS_PRESSED	     
 	cpi r27, 0x01                    
-	breq display_star             
-	rjmp display_dash         
-
-; timer3:
-;
-; Note: There is no "timer3" interrupt handler as you must use
-; timer3 in a polling style (i.e. it is used to drive the refreshing
-; of the LCD display, but LCD functions cannot be called/used from
-; within an interrupt handler).
-
-display_star:
-	ldi r16, 1
-	ldi r17, 15
-	push r16 ;row
-	push r17 ;column
-	rcall lcd_gotoxy
-	pop r17
-	pop r16
-
-	ldi r16, '*'
-	push r16
-	rcall lcd_putchar
-	pop r16
+	breq display_asterisk             
 
 display_dash:
 	ldi r16, 1
@@ -317,6 +295,36 @@ display_dash:
 	push r16
 	rcall lcd_putchar
 	pop r16
+	rjmp start
+
+
+display_asterisk:
+	ldi r16, 1
+	ldi r17, 15
+	push r16 ;row
+	push r17 ;column
+	rcall lcd_gotoxy
+	pop r17
+	pop r16
+
+	ldi r16, '*'
+	push r16
+	rcall lcd_putchar
+	pop r16
+
+	rjmp start
+        
+
+; timer3:
+;
+; Note: There is no "timer3" interrupt handler as you must use
+; timer3 in a polling style (i.e. it is used to drive the refreshing
+; of the LCD display, but LCD functions cannot be called/used from
+; within an interrupt handler).
+
+
+
+
 
 timer4:
 	reti
