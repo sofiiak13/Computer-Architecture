@@ -147,9 +147,9 @@ reset:
 	.equ DOWN	= 0x17C
 	.equ LEFT	= 0x22B
 	.equ SELECT	= 0x316
-	.equ NOT_PRESSED = 0x384
+	.equ NOT_PRESSED = 0x3E8
 
-	;rcall lcd_init 
+	
 
 ; ***************************************************
 ; ******* END OF FIRST "STUDENT CODE" SECTION *******
@@ -220,10 +220,13 @@ reset:
 ; **** BEGINNING OF SECOND "STUDENT CODE" SECTION ****
 ; ****************************************************
 
-	ldi r16, low(NOT_PRESSED)
+	rcall lcd_init 
+
+	ldi r16, low(BUTTON_SELECT_ADC)
 	mov BOUNDARY_L, r16
-	ldi r16, high(NOT_PRESSED)
+	ldi r16, high(BUTTON_SELECT_ADC)
 	mov BOUNDARY_H, r16
+
 
 start:
 	
@@ -231,10 +234,16 @@ start:
 	sbrs temp3, OCF3A
 	rjmp start
 
-	; arrive here? Timer 3 reached its count
-	;
 	ldi temp3, 1<<OCF3A ;clear bit 1 in TIFR3 by writing logical one to its bit position, P163 of the Datasheet
 	out TIFR3, temp3
+
+	ldi r16, 1
+	ldi r17, 15
+	push r16 ;row
+	push r17 ;column
+	rcall lcd_gotoxy
+	pop r17
+	pop r16
 
 	rjmp timer3
 
@@ -243,53 +252,52 @@ stop:
 
 
 timer1:
+	
 
 	lds	r20, ADCSRA_BTN	
 	ori r20, 0x40 
 	sts	ADCSRA_BTN, r20
+	;rcall check_button
+	
+
+;check_button:
 
 wait:
 	lds r20, ADCSRA_BTN ; current timer 
 	andi r20, 0x40
 	brne wait
 
-	
 	lds DATAL, ADCL_BTN
 	lds DATAH, ADCH_BTN
 
 	cp DATAL, BOUNDARY_L
 	cpc DATAH, BOUNDARY_H
 	brsh btn_not_pressed	
-		
-	lds temp1, BUTTON_IS_PRESSED
-	clr temp1
-	inc temp1
+	
+
+	;lds temp1, BUTTON_IS_PRESSED
+	ldi temp1, 1
+	;clr temp1
 	sts BUTTON_IS_PRESSED, temp1
 	reti
 
 btn_not_pressed:	
-	lds temp1, BUTTON_IS_PRESSED
-	clr temp1
+	;lds temp1, BUTTON_IS_PRESSED
+	;clr temp1
+	ldi temp1, 0	; does not reach this fn?
 	sts BUTTON_IS_PRESSED, temp1
 
 	reti
 
-
-
 timer3:
-	
+	clr r27
 	lds r27, BUTTON_IS_PRESSED	     
-	cpi r27, 0x01                    
-	breq display_asterisk             
+	cpi r27, 0x01                   ; button is always one ?? 
+	;breq display_asterisk
+	rjmp display_dash             
 
-display_dash:
-	ldi r16, 1
-	ldi r17, 15
-	push r16 ;row
-	push r17 ;column
-	rcall lcd_gotoxy
-	pop r17
-	pop r16
+
+display_dash:	
 
 	ldi r16, '-'
 	push r16
@@ -299,13 +307,6 @@ display_dash:
 
 
 display_asterisk:
-	ldi r16, 1
-	ldi r17, 15
-	push r16 ;row
-	push r17 ;column
-	rcall lcd_gotoxy
-	pop r17
-	pop r16
 
 	ldi r16, '*'
 	push r16
