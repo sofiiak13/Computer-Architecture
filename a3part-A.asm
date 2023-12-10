@@ -119,37 +119,22 @@ reset:
 ; **** BEGINNING OF FIRST "STUDENT CODE" SECTION ****
 ; ***************************************************
 
-; Anything that needs initialization before interrupts
-; start must be placed here.
-
-	.def temp1 = r21
+	.def temp1 = r21		; define temp registers
 	.def temp3 = r22
 
-	ldi r16, low(RAMEND)
+	ldi r16, low(RAMEND)	; set up a stack 
 	out SPL, r16
 	ldi r16, high(RAMEND)
 	out SPH, r16
 
-	
-	.equ ADCSRA_BTN=0x7A
-	.equ ADCSRB_BTN=0x7B
-	.equ ADMUX_BTN=0x7C
-	.equ ADCL_BTN=0x78
-	.equ ADCH_BTN=0x79
-
-	.def DATAH=r25  ;DATAH:DATAL  store 10 bits data from ADC
+	.def DATAH=r25		;DATAH:DATAL  store 10 bits data from ADC
 	.def DATAL=r24
 	.def BOUNDARY_H=r1  ;hold high byte value of the threshold for button
 	.def BOUNDARY_L=r0  ;hold low byte value of the threshold for button, r1:r0
 
-	.equ RIGHT	= 0x032
-	.equ UP	    = 0x0C3
-	.equ DOWN	= 0x17C
-	.equ LEFT	= 0x22B
-	.equ SELECT	= 0x316
-	.equ NOT_PRESSED = 0x3E8
 
-	
+; Anything that needs initialization before interrupts
+; start must be placed here.
 
 ; ***************************************************
 ; ******* END OF FIRST "STUDENT CODE" SECTION *******
@@ -165,8 +150,8 @@ reset:
 	; read the buttons (i.e., every 10 ms)
 	;
 	ldi temp, (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0)
-	sts ADCSRA, temp1
-	ldi temp1, (1 << REFS0)
+	sts ADCSRA, temp
+	ldi temp, (1 << REFS0)
 	sts ADMUX, r16
 
 	; Timer 1 is for sampling the buttons at 10 ms intervals.
@@ -220,27 +205,21 @@ reset:
 ; **** BEGINNING OF SECOND "STUDENT CODE" SECTION ****
 ; ****************************************************
 
-	rcall lcd_init 
-
-	ldi r16, low(BUTTON_SELECT_ADC)
-	mov BOUNDARY_L, r16
-	ldi r16, high(BUTTON_SELECT_ADC)
-	mov BOUNDARY_H, r16
-
+	rcall lcd_init ; initialize lcd
 
 start:
 	
-	in temp3, TIFR3
+	in temp3, TIFR3		; loop here until the interrupt occurs
 	sbrs temp3, OCF3A
 	rjmp start
 
 	ldi temp3, 1<<OCF3A ;clear bit 1 in TIFR3 by writing logical one to its bit position, P163 of the Datasheet
 	out TIFR3, temp3
 
-	ldi r16, 1
-	ldi r17, 15
-	push r16 ;row
-	push r17 ;column
+	ldi r16, 1		; set the coordinates for asterisk/dash
+	ldi r17, 15		
+	push r16		; row
+	push r17		; column
 	rcall lcd_gotoxy
 	pop r17
 	pop r16
@@ -252,39 +231,38 @@ stop:
 
 
 timer1:
-	
 
-	lds	r20, ADCSRA_BTN	
+	lds	r20, ADCSRA		; load value from ADCSRA to check 0x40 bit
 	ori r20, 0x40 
-	sts	ADCSRA_BTN, r20
-	;rcall check_button
-	
-
-;check_button:
+	sts	ADCSRA, r20
 
 wait:
-	lds r20, ADCSRA_BTN ; current timer 
-	andi r20, 0x40
+	lds r20, ADCSRA 
+	andi r20, 0x40		; if 0x40 bit is set, then we break out of the loop
 	brne wait
 
-	lds DATAL, ADCL_BTN
-	lds DATAH, ADCH_BTN
+	lds DATAL, ADCL		; load low and high data from the buttons
+	lds DATAH, ADCH
 
-	cp DATAL, BOUNDARY_L
+	ldi r16, low(BUTTON_SELECT_ADC)		; load the boundaries to check if button is pressed
+	mov BOUNDARY_L, r16
+	ldi r16, high(BUTTON_SELECT_ADC)
+	mov BOUNDARY_H, r16
+
+
+	cp DATAL, BOUNDARY_L			; compare the data to boundaries
 	cpc DATAH, BOUNDARY_H
-	brsh btn_not_pressed	
-	
+	brsh btn_not_pressed			; if it is higher, then button is not pressed
 
-	;lds temp1, BUTTON_IS_PRESSED
-	ldi temp1, 1
-	;clr temp1
+	
+	ldi temp1, 1					; otherwise button is pressed and we store 1 to BUTTON_IS_PRESSED
 	sts BUTTON_IS_PRESSED, temp1
-	reti
+	
+	reti							
 
 btn_not_pressed:	
-	;lds temp1, BUTTON_IS_PRESSED
-	;clr temp1
-	ldi temp1, 0	; does not reach this fn?
+	
+	ldi temp1, 0					; otherwise store 0 to BUTTON_IS_PRESSED
 	sts BUTTON_IS_PRESSED, temp1
 
 	reti
@@ -292,14 +270,14 @@ btn_not_pressed:
 timer3:
 	clr r27
 	lds r27, BUTTON_IS_PRESSED	     
-	cpi r27, 0x01                   ; button is always one ?? 
-	;breq display_asterisk
+	cpi r27, 0x01                   ; check if BUTTON_IS_PRESSED is 0 or 1 and branch to display dash or asterisk respectively
+	breq display_asterisk
 	rjmp display_dash             
 
 
 display_dash:	
-
-	ldi r16, '-'
+	
+	ldi r16, '-'		
 	push r16
 	rcall lcd_putchar
 	pop r16
@@ -314,17 +292,12 @@ display_asterisk:
 	pop r16
 
 	rjmp start
-        
-
 ; timer3:
 ;
 ; Note: There is no "timer3" interrupt handler as you must use
 ; timer3 in a polling style (i.e. it is used to drive the refreshing
 ; of the LCD display, but LCD functions cannot be called/used from
 ; within an interrupt handler).
-
-
-
 
 
 timer4:

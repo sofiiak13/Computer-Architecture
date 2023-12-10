@@ -122,20 +122,43 @@ reset:
 ; Anything that needs initialization before interrupts
 ; start must be placed here.
 
-	.def temp1 = r21
+	.def temp1 = r21	; define temp registers
 	.def temp3 = r22
 
-	ldi r16, low(RAMEND)
+	ldi r16, low(RAMEND)	; set up a stack 
 	out SPL, r16
 	ldi r16, high(RAMEND)
 	out SPH, r16
 
 	.def DATAH=r25  ;DATAH:DATAL  store 10 bits data from ADC
 	.def DATAL=r24
-	.def BOUNDARY_H=r1  ;hold high byte value of the threshold for button
-	.def BOUNDARY_L=r0  ;hold low byte value of the threshold for button, r1:r0
-	.def BOUNDARY2_H=r3  ;hold high byte value of the threshold for button
-	.def BOUNDARY2_L=r2  ;hold low byte value of the threshold for button, r1:r0
+	.def BOUNDARY_H=r1  ;hold high byte value of the threshold for button is pressed
+	.def BOUNDARY_L=r0   ;hold low byte value of the threshold for button, r1:r0
+
+	.def BOUNDARY2_H=r3  ;hold high byte value of the threshold for which button is preesed
+	.def BOUNDARY2_L=r2  ;hold low byte value of the threshold for button, r3:r2
+
+clear:
+	clr r18
+	sts CURRENT_CHARSET_INDEX, r18	; clear content before we start our program
+	ldi r18, ' '
+	sts TOP_LINE_CONTENT, r18
+	clr r24
+
+string_len:
+	ldi ZH, high(AVAILABLE_CHARSET<<1) ; access first letter in AVAILABLE_CHARSET
+	ldi ZL, low(AVAILABLE_CHARSET<<1)
+
+length_loop:			; loop through the AVAILABLE_CHARSET to find out the length of the string
+	lpm r16, Z+
+	cpi r16, 0x00
+	breq store
+	inc r24
+	rjmp length_loop
+
+store:
+	sts LENGTH, r24		; since r24 was the count for the length, store it in LENGTH
+
 
 ; ***************************************************
 ; ******* END OF FIRST "STUDENT CODE" SECTION *******
@@ -206,17 +229,16 @@ reset:
 ; **** BEGINNING OF SECOND "STUDENT CODE" SECTION ****
 ; ****************************************************
 
-rcall lcd_init 
+rcall lcd_init ; initialize lcd
 
 start:
 	
-	in temp3, TIFR3
+	in temp3, TIFR3		; loop here until the interrupt occurs
 	sbrs temp3, OCF3A
 	rjmp start
 
 	ldi temp3, 1<<OCF3A ;clear bit 1 in TIFR3 by writing logical one to its bit position, P163 of the Datasheet
 	out TIFR3, temp3
-
 
 	rjmp timer3
 
@@ -226,84 +248,90 @@ stop:
 
 timer1:
 
-	lds r16, SREG
-	push r16
+	push r16	; push everything we are going to use
 	push r20 
+	push r30
 	push DATAL
 	push DATAH
-	
+	push BOUNDARY_L
+	push BOUNDARY_H
+	push temp1
+	push BOUNDARY2_L
+	push BOUNDARY2_H
+	lds r16, SREG
+	push r16
 
-	lds	r20, ADCSRA
+	lds	r20, ADCSRA		; load value from ADCSRA to check 0x40 bit
 	ori r20, 0x40 
 	sts	ADCSRA, r20	
 
 wait:
-	lds r20, ADCSRA ; current timer 
+	lds r20, ADCSRA		; if 0x40 bit is set, then we break out of the loop
 	andi r20, 0x40
 	brne wait
 
-	lds DATAL, ADCL
+	lds DATAL, ADCL		; load low and high data from the buttons
 	lds DATAH, ADCH
 
 
-	ldi r16, low(BUTTON_SELECT_ADC)
+	ldi r16, low(BUTTON_SELECT_ADC)		; load the boundaries to check if button is pressed
 	mov BOUNDARY_L, r16
 	ldi r16, high(BUTTON_SELECT_ADC)
 	mov BOUNDARY_H, r16
 
 
-	cp DATAL, BOUNDARY_L
+	cp DATAL, BOUNDARY_L			; compare the data to boundaries
 	cpc DATAH, BOUNDARY_H
-	brsh btn_not_pressed	
+	brsh btn_not_pressed			; if it is higher, then button is not pressed
 	
-	ldi temp1, 1
+	ldi temp1, 1					; otherwise button is pressed and we store 1 to BUTTON_IS_PRESSED
 	sts BUTTON_IS_PRESSED, temp1
-	rjmp check_R
+	rjmp check_R					; and jump to check which button is pressed
 	
 
 
 check_R:
-	ldi r16, low(BUTTON_RIGHT_ADC)
+	ldi r16, low(BUTTON_RIGHT_ADC)	; load the boundaries for right button
 	mov BOUNDARY2_L, r16
 	ldi r16, high(BUTTON_RIGHT_ADC)
 	mov BOUNDARY2_H, r16
 
 	cp DATAL, BOUNDARY2_L
 	cpc DATAH, BOUNDARY2_H
-	brlo set_R ; branch if lower
+	brlo set_R						; if the data is lower, then right button is pressed. So we jump to store 'R'
 	
 	
 
 check_U:
-	ldi r16, low(BUTTON_UP_ADC)
+	ldi r16, low(BUTTON_UP_ADC)	; load the boundaries for up button
 	mov BOUNDARY2_L, r16
 	ldi r16, high(BUTTON_UP_ADC)
 	mov BOUNDARY2_H, r16
 
 	cp DATAL, BOUNDARY2_L
 	cpc DATAH, BOUNDARY2_H
-	brlo set_U
+	brlo set_U					; if the data is lower, then up button is pressed. So we jump to store 'U'
 	
 
 check_D:
-	ldi r16, low(BUTTON_DOWN_ADC)
+	ldi r16, low(BUTTON_DOWN_ADC)	; load the boundaries for down button
 	mov BOUNDARY2_L, r16
 	ldi r16, high(BUTTON_DOWN_ADC)
 	mov BOUNDARY2_H, r16
 
 	cp DATAL, BOUNDARY2_L
 	cpc DATAH, BOUNDARY2_H
-	brlo set_D
+	brlo set_D						; if the data is lower, then down button is pressed. So we jump to store 'D'
 
 check_L:
-	ldi r16, low(BUTTON_LEFT_ADC)
+	ldi r16, low(BUTTON_LEFT_ADC)	; load the boundaries for left button
 	mov BOUNDARY2_L, r16
 	ldi r16, high(BUTTON_LEFT_ADC)
 	mov BOUNDARY2_H, r16
 
 	cp DATAL, BOUNDARY2_L
 	cpc DATAH, BOUNDARY2_H
-	brlo set_L
+	brlo set_L					; if the data is lower, then left button is pressed. So we jump to store 'L'
 
 set_R:
 	ldi r30, 'R'
@@ -328,30 +356,45 @@ set_L:
 
 btn_not_pressed:	
 	
-	ldi temp1, 0	
+	ldi temp1, 0				; if button is not pressed, we store 0 in BUTTON_IS_PRESSED
 	sts BUTTON_IS_PRESSED, temp1
+
 
 end_1:
 
-	pop DATAL
+	pop r16			; pop everything 
+	sts SREG, r16
+	pop BOUNDARY2_H
+	pop BOUNDARY2_L
+	pop temp1
+	pop BOUNDARY_H
+	pop BOUNDARY_L
 	pop DATAH
+	pop DATAL
+	pop r30
 	pop r20
 	pop r16
-	sts SREG, r16
-
+	
 	reti
 
 timer3:
-	ldi r16, 1
-	ldi r17, 15
-	push r16 ;row
-	push r17 ;column
+
+	push r16		; push everything we are going to use
+	push r17
+	push r27
+	push r28
+	push r29
+
+	ldi r16, 1		; set coordinates for dash or asterisk
+	ldi r17, 15		
+	push r16 
+	push r17 
 	rcall lcd_gotoxy
 	pop r17
 	pop r16
 
 	clr r27
-	lds r27, BUTTON_IS_PRESSED	     
+	lds r27, BUTTON_IS_PRESSED	  ; check if BUTTON_IS_PRESSED is 0 or 1 and branch to display dash or asterisk respectively
 	cpi r27, 0x01                   
 	breq display_asterisk
             
@@ -369,26 +412,22 @@ display_asterisk:
 	ldi r16, '*'
 	push r16
 	rcall lcd_putchar
-	pop r16
+	pop r16			; if we got here it means that button is pressed and we need to display which one is being pressed
 
 display_letter:
-	ldi r16, 1
+	ldi r16, 1		; set cooridinates to display letter
 	ldi r17, 0
-	push r16 ;row
-	push r17 ;column 
+	push r16 
+	push r17 
 	rcall lcd_gotoxy
 	pop r17
 	pop r16
 
 	clr r28
-	lds r28, LAST_BUTTON_PRESSED 
-	ldi r29, ' '
-	
-	push r28 
-	push r29
-	
-	
-	cpi r28, 'L'
+	lds r28, LAST_BUTTON_PRESSED ; load LAST_BUTTON_PRESSED to r28
+	ldi r29, ' '				; load space to r29
+			
+	cpi r28, 'L'				; compare r28 to find out which button we need to display
 	breq write_L
 	
 	cpi r28, 'D'
@@ -438,7 +477,7 @@ write_D:
 	rcall lcd_putchar
 	pop r29
 
-	rjmp display_top
+	rjmp display_top	; if we got here we need to display top content 
 
 write_U:
 	push r29
@@ -457,7 +496,7 @@ write_U:
 	rcall lcd_putchar
 	pop r29
 
-	rjmp display_top
+	rjmp display_top	; if we got here we need to display top content
 
 write_R:
 	push r29
@@ -477,12 +516,11 @@ write_R:
 	pop r28
 	rjmp end_3
 
-
 display_top:
 	ldi r16, 0
 	ldi r17, 0
-	push r16 ;row
-	push r17 ;column 
+	push r16 
+	push r17 
 	rcall lcd_gotoxy
 	pop r17
 	pop r16
@@ -498,8 +536,10 @@ end_3:
 
 	pop r29
 	pop r28
+	pop r27
+	pop r17
+	pop r16
 	rjmp start
-
 
 
 ; timer3:
@@ -510,9 +550,23 @@ end_3:
 ; within an interrupt handler).
 
 
+
 timer4:
-	clr temp1
-	lds temp1, LAST_BUTTON_PRESSED	
+	
+	push temp1
+	push ZL		; push everything we are going to use
+	push ZH
+	push r18
+	push r17
+	push r20
+	push r31
+	lds temp1, SREG
+	push temp1
+	push r21
+	push temp3
+
+
+	lds temp1, LAST_BUTTON_PRESSED	; load LAST_BUTTON_PRESSED and check if it is U or D
 
 	cpi temp1, 'U'
 	breq increase_indx
@@ -520,67 +574,59 @@ timer4:
 	cpi temp1, 'D'
 	breq decrease_indx
 
-	reti
 
-
-;IN THE LOOP YOUR VALUE SHOULD BE 0 + CHAR_INDEX
-;USE TOP_LINE TO SAVE THE VALUE THAT YOU NEED TO DISPLAY AND DISPLAY IT IN TIMER 3
 increase_indx:
-; if doesn't work replace temp1 
 
-	lds temp1, CURRENT_CHARSET_INDEX 	; load cur index 
-	inc temp1				; update it by increasing by one
-	sts CURRENT_CHARSET_INDEX, temp1
-
-	rjmp search
+	lds r31, CURRENT_CHARSET_INDEX 	; load cur index 
+	inc r31							; update it by increasing by one
+	rjmp check_boundary
 
 decrease_indx:
 
-	lds temp1, CURRENT_CHARSET_INDEX	; load cur index 
-	dec temp1				; update it by decreasing by one
-	sts CURRENT_CHARSET_INDEX, temp1
+	lds r31, CURRENT_CHARSET_INDEX	; load cur index 
+	dec r31							; update it by decreasing by one
 
-search:
-	clr r17		; clear everything we are going to use
-	clr r22
-	clr r18
+check_boundary:						; make sure CURRENT_CHARSET_INDEX is not higher than the length
+	lds temp3, LENGTH
 
-	push ZL		; push everything we are going to use
-	push ZH
-	push r18
-	push r17
+	cp r31, temp3
+	brsh end_search					; if it is higher, we do not modify CURRENT_CHARSET_INDEX
 
-	in ZH, SPH ; make zh a stack pointer to high byte
-	in ZL, SPL ; make zl a stack pointer to low byte
+	sts CURRENT_CHARSET_INDEX, r31	; else update CURRENT_CHARSET_INDEX
+
+search:	
 
 	ldi ZH, high(AVAILABLE_CHARSET<<1) ; access first letter
 	ldi ZL, low(AVAILABLE_CHARSET<<1)
 
-	lds r22, CURRENT_CHARSET_INDEX
+	lds r22, CURRENT_CHARSET_INDEX	; load CURRENT_CHARSET_INDEX to r22
+
+	clr r21
+
+	add ZL, r22						; add CURRENT_CHARSET_INDEX to the first letter adress 
+	adc ZH, r21	
+
+	lpm r18, Z						; laod correct letter into r18
+	sts TOP_LINE_CONTENT, r18		; store r18 into TOP_LINE_CONTENT
 	
-loop:
-	lpm r18, Z+			; start looping through AVAILABLE_CHARSET
-	cpi r18, 0x00		
-	breq end_search			
-
-	dec r22
-	tst r22
-	breq store_top
-
-	rjmp loop			; else continue looping
-	
-store_top:
-
-	sts TOP_LINE_CONTENT, r18
 	
 end_search:
 
+	pop temp3			; pop everything 
+	pop r21
+	pop temp1
+	sts SREG, temp1
+	pop r31
+	pop r20
 	pop r17
 	pop r18
 	pop ZH
-	pop ZL
-	
+	pop ZL	
+	pop temp1
+
 	reti
+
+
 
 
 
@@ -654,6 +700,8 @@ CURRENT_CHAR_INDEX: .byte 1			; ; updated by timer4 interrupt, used by LCD updat
 ; ***************************************************
 
 .dseg
+
+LENGTH: .byte 1
 
 ; If you should need additional memory for storage of state,
 ; then place it within the section. However, the items here
