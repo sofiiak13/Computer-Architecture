@@ -1,10 +1,4 @@
 /* a4.c
- * CSC Fall 2022
- * 
- * Student name: Sofiia Khutorna
- * Student UVic ID: v00999227
- * Date of completed work:
- *
  *
  * Code provided for Assignment #4
  *
