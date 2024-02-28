@@ -1,6 +1,5 @@
 ; main.asm for edit-distance assignment
 ;
-; CSC 230: Fall 2022
 ;
 ; Code provided for Assignment #1
 ;
