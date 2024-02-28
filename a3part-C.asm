@@ -2,12 +2,7 @@
 ; a3part-C.asm
 ;
 ; Part C of assignment #3
-;
-;
-; Student name: Sofiia Khutorna
-; Student ID: v00999227
-; Date of completed work:
-;
+
 ; **********************************
 ; Code provided for Assignment #3
 ;
