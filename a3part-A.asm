@@ -1,13 +1,6 @@
 ;
 ; a3part-A.asm
-;
-; Part A of assignment #3
-;
-;
-; Student name:
-; Student ID:
-; Date of completed work:
-;
+
 ; **********************************
 ; Code provided for Assignment #3
 ;
