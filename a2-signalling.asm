@@ -1,5 +1,4 @@
 ; a2-signalling.asm
-; CSC 230: Fall 2022
 ;
 ; Student name:
 ; Student ID:
